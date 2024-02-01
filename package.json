@@ -3,6 +3,7 @@
   "displayName": "plastic-io-graph-coder",
   "description": "Plastic-io graph code gateway.",
   "version": "0.0.1",
+  "repository": "https://github.com/plastic-io/plastic-io-graph-coder",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -58,6 +59,7 @@
     ]
   },
   "scripts": {
+    "vsce-package": "vsce package",
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
     "watch": "webpack --watch",
@@ -74,6 +76,7 @@
     "@types/node": "18.x",
     "@types/node-fetch": "^2.6.11",
     "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "@vscode/test-cli": "^0.0.4",
@@ -85,9 +88,10 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "bufferutil": "^4.0.8",
     "deep-diff": "^1.0.2",
     "isomorphic-fetch": "^3.0.0",
-    "save": "^2.9.0",
+    "utf-8-validate": "^6.0.3",
     "ws": "^8.16.0"
   }
 }
