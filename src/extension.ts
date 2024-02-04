@@ -492,7 +492,7 @@ class GraphFileSystemProvider implements vscode.FileSystemProvider {
 			}
 			const node = graph.nodes[path[1]];
 			const type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
-			data = type === 'data' ? node.data : node.template[type];
+			data = type === 'data' ? JSON.stringify(node.data) : node.template[type];
 			return encoder.encode(data || '');
     }
 
@@ -509,11 +509,18 @@ class GraphFileSystemProvider implements vscode.FileSystemProvider {
 					graph.properties.template = content.toString();
 				} else {
 					type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
+					if (type === 'data') {
+						try {
+							JSON.parse(content.toString());
+						} catch(err) {
+							vscode.window.showWarningMessage("Data must be valid JSON to be saved.");
+						}
+					}
 					const nodeIndex = uri.fragment.split('/')[1];
 					const node = graph.nodes[nodeIndex];
 					const snapshotNode = graph.nodes.find((n: any) => n.id === node.id);
 					if (type === 'data') {
-						snapshotNode.data = content.toString();
+						snapshotNode.data = JSON.parse(content.toString());
 					} else {
 						snapshotNode.template[type] = content.toString();
 					}
