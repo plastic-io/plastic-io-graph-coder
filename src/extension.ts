@@ -236,6 +236,18 @@ export function activate(context: vscode.ExtensionContext) {
 			.then(doc => vscode.window.showTextDocument(doc));
 	});
 
+	let disposable1 = vscode.commands.registerCommand('plastic-io-graph-coder.openWebView', (url) => {
+		console.log('url', url);
+		const uri = vscode.Uri.parse(url);
+    vscode.env.openExternal(uri).then(success => {
+        if (!success) {
+            vscode.window.showErrorMessage(`Failed to open URL: ${url}`);
+        }
+    });
+	});
+
+
+	context.subscriptions.push(disposable1);
 	context.subscriptions.push(disposable2);
 	context.subscriptions.push(disposable3);
 
@@ -265,9 +277,21 @@ class DirectoryTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
 		if (element) {
 			if (element.contextValue === 'graph') {
-				console.log('graph selected', element);
 				const graph = await getGraph((element.id as string).split('#')[1]);
-				return graph.nodes.map((node: any, i: number) => {
+				console.log('graph selected', element);
+
+				const item = new vscode.TreeItem('presentation.vue', vscode.TreeItemCollapsibleState.None);
+				item.id = `${graph.properties.name}/presentation.vue#${graph.id}`;
+				item.contextValue = 'graphPresentation';
+				item.description = graph.properties.description;
+				treeItems[item.id] = item;
+				item.command = {
+					command: 'plastic-io-graph-coder.treeItemClick',
+					title: 'Handle Tree Item Click',
+					arguments: [item.id],
+				};
+
+				const nodes = graph.nodes.map((node: any, i: number) => {
 					const name = (node.properties.name || 'Unnamed');
 					const item = new vscode.TreeItem(name, vscode.TreeItemCollapsibleState.Collapsed);
 					item.id = `${graph.properties.name}/${node.properties.name || 'Unnamed'}#${graph.id}/${i}`;
@@ -276,6 +300,7 @@ class DirectoryTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeIt
 					treeItems[item.id] = item;
 					return item;
 				});
+				return [item, ...nodes]
 			}
 			if (element.contextValue === 'node') {
 				console.log('vue', (element.id as string).replace('#', '/presentation.vue#'));
@@ -331,6 +356,11 @@ class DirectoryTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeIt
 				item.id = `${localToc[key].name}#${localToc[key].id}`;
 				treeItems[item.id] = item;
 				item.tooltip = localToc[key].description;
+				item.command = {
+					command: "plastic-io-graph-coder.openWebView",
+					title: "Open Graph View",
+					arguments: [`https://plastic-io.github.io/graph-editor/${key}`]
+				};
 				return item;
 			}).sort((a: any, b: any) => {
 				return a.id.localeCompare(b.id);
@@ -375,6 +405,15 @@ class GraphFileSystemProvider implements vscode.FileSystemProvider {
 				}
 
 				if (uri.path.split('/').length === 3) {
+					if (/presentation.vue$/.test(uri.path)) {
+						const i = {
+							type: vscode.FileType.File,
+							ctime: graph.properties.createdOn,
+							mtime: graph.properties.lastUpdate,
+							size: JSON.stringify(graph.properties.template || '').length,
+						};
+						return i;
+					}
 					return {
 						type: vscode.FileType.Directory,
 						ctime: node.properties.createdOn,
@@ -442,28 +481,42 @@ class GraphFileSystemProvider implements vscode.FileSystemProvider {
   	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
 			console.log('read file', uri);
 			const path = uri.fragment.split('/');
-			const node = await getNode(`${path[0]}/${path[1]}`);
-			const type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
-			subscribe("graph-event-" + node.graphId);
+			const isGraphPresentation = path.length === 1;
+			const graph = await getGraph(`${path[0]}`);
+			subscribe("graph-event-" + graph.id);
 			const encoder = new TextEncoder();
-			const data = type === 'data' ? node.data : node.template[type];
+			let data: any;
+			if (isGraphPresentation) {
+				data = graph.properties.template;
+				return encoder.encode(data || '');
+			}
+			const node = graph.nodes[path[1]];
+			const type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
+			data = type === 'data' ? node.data : node.template[type];
 			return encoder.encode(data || '');
     }
 
     async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
         // create a diff and event and send it to the server
 				const path = uri.fragment.split('/');
-				const type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
+				const isGraphPresentation = path.length === 1;
 				const graphId = uri.fragment.split('/')[0];
-				const nodeIndex = uri.fragment.split('/')[1];
 				const graph = await getGraph(graphId);
-				const node = graph.nodes[nodeIndex];
 				const snapshotGraph = JSON.parse(JSON.stringify(graph));
-				const snapshotNode = graph.nodes.find((n: any) => n.id === node.id);
-				if (type === 'data') {
-					snapshotNode.data = content.toString();
+				let type;
+				if (isGraphPresentation) {
+					type = 'Graph Presentation';
+					graph.properties.template = content.toString();
 				} else {
-					snapshotNode.template[type] = content.toString();
+					type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
+					const nodeIndex = uri.fragment.split('/')[1];
+					const node = graph.nodes[nodeIndex];
+					const snapshotNode = graph.nodes.find((n: any) => n.id === node.id);
+					if (type === 'data') {
+						snapshotNode.data = content.toString();
+					} else {
+						snapshotNode.template[type] = content.toString();
+					}
 				}
         const changes = diff(snapshotGraph, graph);
         if (changes) {

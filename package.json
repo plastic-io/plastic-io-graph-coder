@@ -45,6 +45,10 @@
     },
     "commands": [
       {
+        "command": "plastic-io-graph-coder.openWebView",
+        "title": "Open Graph View"
+      },
+      {
         "command": "plastic-io-graph-coder.treeItemClick",
         "title": "Handle Tree Item Click"
       },
