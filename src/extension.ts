@@ -492,7 +492,7 @@ class GraphFileSystemProvider implements vscode.FileSystemProvider {
 			}
 			const node = graph.nodes[path[1]];
 			const type = uri.path.split('/')[3].replace(/presentation\.|\.jso?n?/, '');
-			data = type === 'data' ? JSON.stringify(node.data) : node.template[type];
+			data = type === 'data' ? JSON.stringify(node.data, null, '\t') : node.template[type];
 			return encoder.encode(data || '');
     }
 
